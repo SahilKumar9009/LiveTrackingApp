@@ -6,24 +6,39 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = __importDefault(require("express"));
 const http_1 = __importDefault(require("http"));
 const socket_io_1 = require("socket.io");
+const cors_1 = __importDefault(require("cors"));
 const app = (0, express_1.default)();
 const server = http_1.default.createServer(app);
-const io = new socket_io_1.Server(server);
-app.get("/", (req, res) => { });
+const io = new socket_io_1.Server(server, {
+    cors: {
+        origin: "*",
+        methods: ["GET", "POST"]
+    }
+});
+// Middleware
+app.use((0, cors_1.default)());
+app.use(express_1.default.json());
+app.get("/", (req, res) => {
+    res.json({ status: "Server is running", timestamp: new Date().toISOString() });
+});
+// HTTP endpoint to receive location from mobile app
+app.post("/location", (req, res) => {
+    const locationData = req.body;
+    console.log("📍 Received location:", locationData);
+    // Broadcast to all connected Socket.io clients (web dashboard)
+    io.emit("receive-location", locationData);
+    res.json({ success: true, timestamp: Date.now() });
+});
+// Socket.io for web clients (dashboard)
 io.on("connection", (socket) => {
-    console.log("A user connected:", socket.id);
-    socket.on("send-location", (data) => {
-        console.log("in teh data", data);
-        io.emit("receive-location", Object.assign({ id: socket.id }, data));
-    });
-    socket.on("receive-location", (data) => {
-        console.log("Received location:", data);
-    });
+    console.log("🌐 Web client connected:", socket.id);
     socket.on("disconnect", () => {
-        console.log("User disconnected");
+        console.log("Web client disconnected");
     });
 });
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
-    console.log("the Serveer is Runninon th eport", PORT);
+    console.log(`🚀 Server running on port ${PORT}`);
+    console.log(`📱 Mobile app should POST to: http://192.168.0.54:${PORT}/location`);
+    console.log(`🌐 Web clients can connect via Socket.io`);
 });
